@@ -1,0 +1,20 @@
+Forma browser STEP runtime
+
+OpenCascade.js 2.0.0-beta.b5ff984: LGPL-2.1-only.
+Unmodified runtime distributed as opencascade.full.js and opencascade.full.wasm.
+License: LICENSE. Corresponding upstream source and build instructions:
+https://github.com/donalffons/opencascade.js/tree/b5ff984
+https://www.npmjs.com/package/opencascade.js/v/2.0.0-beta.b5ff984
+Open CASCADE Technology source and notices are included through that upstream project.
+
+opentype.js 1.3.4: MIT. License: opentype.LICENSE.
+https://github.com/opentypejs/opentype.js
+
+earcut 3.0.2: ISC. License: earcut.LICENSE.
+https://github.com/mapbox/earcut
+
+Noto Sans SC: SIL Open Font License 1.1. License: OFL.txt.
+https://github.com/notofonts/noto-cjk
+
+sample.step: NIST PMI test case nist_ctc_01_asme1_ap242-e1.
+https://www.nist.gov/el/systems-integration-division-73400/model-based-enterprise/pmi-validation-and-conformance-testing

@@ -12,26 +12,45 @@ html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#e6eeeb;col
 <body>
 <canvas id="canvas" tabindex="0">浏览器需要支持 WebGL 2。</canvas>
 <div id="loading"><h1>Forma</h1><p>正在准备模型与测量工具…</p><progress id="progress"></progress><p id="error"></p></div>
+<div id="step-busy" hidden style="position:fixed;inset:0;background:#f2f0e9dd;z-index:10;place-content:center;text-align:center;font-size:18px;color:#283f3c">正在本机处理 STEP…首次需要加载几何内核，请稍候。</div>
 <script src="index.js"></script>
 <script>
-const engine = new Engine({"args":[],"canvasResizePolicy":2,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":15184116,"index.wasm":39514754},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4});
+const engine = new Engine({"args":[],"canvasResizePolicy":2,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":15184420,"index.wasm":39514754},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4});
 let uploadId = 0;
-// Browser file access is explicit. Nothing is uploaded to a remote server.
+// STEP processing stays in a local Web Worker; no model is uploaded.
+const stepBusy = active => {const element=document.getElementById('step-busy');element.hidden=!active;element.style.display=active?'grid':'none';};
+const stepRuntime = () => import('./step-wasm/client.min.mjs');
+async function loadStepBytes(bytes,name,done) {
+  try {
+    stepBusy(true);
+    const result=await (await stepRuntime()).importStep(bytes,name);
+    const prefix='/tmp/mbd-upload-'+(++uploadId)+'/';
+    for(const [file,data] of Object.entries(result.files))engine.copyToFS(prefix+file,data);
+    done(JSON.stringify({kind:'step_bundle',token:result.token,paths:[prefix+'bundle.json']}));
+  } catch(error){done(JSON.stringify({error:String(error)}));} finally {stepBusy(false);}
+}
 window.MBDWeb = {
+  async loadStepSample(done){
+    try {stepBusy(true);const response=await fetch('./step-wasm/sample.step');if(!response.ok)throw Error('STEP 示例加载失败');await loadStepBytes(new Uint8Array(await response.arrayBuffer()),'STEP＋PMI 示例.step',done);}catch(error){done(JSON.stringify({error:String(error)}));}finally{stepBusy(false);}
+  },
+  async importStepBytes(base64,name,done){await loadStepBytes(Uint8Array.from(atob(base64),c=>c.charCodeAt(0)),name,done);},
   async exportStep(payload, token, source, done) {
     try {
-      const response = await fetch('/api/step/export',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token,payload:JSON.parse(payload)})});
-      if (!response.headers.get('content-type')?.includes('application/json')) throw new Error('当前站点未启用 STEP 导出服务，请使用项目本地服务或桌面版。');
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.error);
+      stepBusy(true);
+      const result = await (await stepRuntime()).exportStep(JSON.parse(payload),token);
       const download = (data,name,type) => {
         const url=URL.createObjectURL(new Blob([data],{type}));
         const link=document.createElement('a'); link.href=url; link.download=name; document.body.appendChild(link); link.click(); link.remove(); setTimeout(()=>URL.revokeObjectURL(url),60000);
       };
-      download(Uint8Array.from(atob(result.file),c=>c.charCodeAt(0)),result.name,'application/step');
-      download(JSON.stringify(result.report,null,2),'forma-annotated.step.report.json','application/json');
+      download(result.bytes,'forma-annotated.step','application/step');
+      // A second automatic download can cancel the STEP in embedded browsers.
+      let reportLink=document.getElementById('step-report-download');
+      if(!reportLink){reportLink=document.createElement('a');reportLink.id='step-report-download';reportLink.style.cssText='position:fixed;right:24px;bottom:100px;padding:10px 16px;background:#fbfcf8;color:#397e73;border-radius:12px;z-index:5';document.body.appendChild(reportLink);}
+      if(reportLink.href.startsWith('blob:'))URL.revokeObjectURL(reportLink.href);
+      reportLink.href=URL.createObjectURL(new Blob([JSON.stringify(result.report,null,2)],{type:'application/json'}));
+      reportLink.download='forma-annotated.step.report.json';reportLink.textContent='下载 STEP 导出报告';
       done(JSON.stringify(result.report));
-    } catch(error) {done(JSON.stringify({error:String(error)}));}
+    } catch(error) {done(JSON.stringify({error:String(error)}));} finally {stepBusy(false);}
   },
   pick(kind, done) {
     const input = document.createElement('input');
@@ -44,12 +63,10 @@ window.MBDWeb = {
       try {
         const step = Array.from(input.files).find(file => /\.(step|stp)$/i.test(file.name));
         if (step && kind === 'model') {
-          const response = await fetch('/api/step/import', {method:'POST', headers:{'Content-Type':'application/octet-stream'}, body:await step.arrayBuffer()});
-          if (!response.headers.get('content-type')?.includes('application/json')) throw new Error('当前站点未启用 STEP 服务，请使用项目本地服务或桌面版。');
-          const result = await response.json();
-          if (!response.ok) throw new Error(result.error);
+          stepBusy(true);
+          const result = await (await stepRuntime()).importStep(new Uint8Array(await step.arrayBuffer()),step.name);
           const prefix = '/tmp/mbd-upload-' + (++uploadId) + '/';
-          for (const [name,data] of Object.entries(result.files)) engine.copyToFS(prefix+name,Uint8Array.from(atob(data),c=>c.charCodeAt(0)));
+          for (const [name,data] of Object.entries(result.files)) engine.copyToFS(prefix+name,data);
           done(JSON.stringify({kind:'step_bundle',token:result.token,paths:[prefix+'bundle.json']}));
           return;
         }
@@ -63,7 +80,7 @@ window.MBDWeb = {
         }
         if (paths.length) done(JSON.stringify({kind, paths}));
       } catch (error) { done(JSON.stringify({kind, error: String(error)})); }
-      finally { input.remove(); }
+      finally { stepBusy(false); input.remove(); }
     }, {once:true});
     input.addEventListener('cancel', () => input.remove(), {once:true});
     input.click();
