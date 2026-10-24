@@ -19,7 +19,7 @@ const engine = new Engine({"args":[],"canvasResizePolicy":2,"emscriptenPoolSize"
 let uploadId = 0;
 // STEP processing stays in a local Web Worker; no model is uploaded.
 const stepBusy = active => {const element=document.getElementById('step-busy');element.hidden=!active;element.style.display=active?'grid':'none';};
-const stepRuntime = () => import('./step-wasm/client.min.mjs?v=f6c5a60334488c8d');
+const stepRuntime = () => import('./step-wasm/client.min.mjs?v=af73eae8820649a8');
 async function loadStepBytes(bytes,name,done) {
   try {
     stepBusy(true);
