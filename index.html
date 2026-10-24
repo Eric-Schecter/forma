@@ -15,11 +15,11 @@ html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#e6eeeb;col
 <div id="step-busy" hidden></div>
 <script src="index.js"></script>
 <script>
-const engine = new Engine({"args":[],"canvasResizePolicy":2,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":15208756,"index.wasm":39514754},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4});
+const engine = new Engine({"args":[],"canvasResizePolicy":2,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":9581172,"index.wasm":39514754},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4});
 let uploadId = 0;
 // STEP processing stays in a local Web Worker; no model is uploaded.
 const stepBusy = (active,mode='import') => {const element=document.getElementById('step-busy');element.dataset.mode=mode;element.textContent=mode==='export'?'正在生成并校验 STEP…':'正在本机加载 STEP…';element.hidden=!active;element.style.display=active?'grid':'none';};
-const stepRuntime = () => import('./step-wasm/client.min.mjs?v=042d8f2e375f70f0');
+const stepRuntime = () => import('./step-wasm/client.min.mjs?v=61a269f800c60d18');
 async function loadStepBytes(bytes,name,done) {
   try {
     stepBusy(true);
@@ -90,7 +90,16 @@ if (missing.length) fail(missing.join(', '));
 else engine.startGame({onProgress(current,total){
   const bar = document.getElementById('progress');
   if (total > 0) {bar.max=total;bar.value=current;}
-}}).then(() => document.getElementById('loading').remove()).catch(fail);
+}}).then(() => {
+  document.getElementById('loading').remove();
+  // Start only after the UI is usable, and respect data-saving/slow networks.
+  const connection = navigator.connection;
+  if (!connection?.saveData && !['slow-2g','2g'].includes(connection?.effectiveType)) {
+    const warm = () => stepRuntime().then(runtime => runtime.warmStepKernel()).catch(() => {});
+    if ('requestIdleCallback' in window) requestIdleCallback(warm,{timeout:10000});
+    else setTimeout(warm,2000);
+  }
+}).catch(fail);
 </script>
 </body>
 </html>
