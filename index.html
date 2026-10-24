@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Forma · 模型与工程标注</title>
+<style>
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#e6eeeb;color:#283f3c;font-family:system-ui,sans-serif}#canvas{display:block;outline:none;width:100%;height:100%;touch-action:none}#loading{position:fixed;inset:0;display:grid;place-content:center;gap:16px;text-align:center;background:#e6eeeb}h1{margin:0;font-size:30px}p{margin:0;color:#647973}progress{width:320px;accent-color:#397e73}#error{max-width:600px;white-space:pre-wrap}
+</style>
+
+</head>
+<body>
+<canvas id="canvas" tabindex="0">浏览器需要支持 WebGL 2。</canvas>
+<div id="loading"><h1>Forma</h1><p>正在准备模型与测量工具…</p><progress id="progress"></progress><p id="error"></p></div>
+<script src="index.js"></script>
+<script>
+const engine = new Engine({"args":[],"canvasResizePolicy":2,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":15184116,"index.wasm":39514754},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4});
+let uploadId = 0;
+// Browser file access is explicit. Nothing is uploaded to a remote server.
+window.MBDWeb = {
+  async exportStep(payload, token, source, done) {
+    try {
+      const response = await fetch('/api/step/export',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token,payload:JSON.parse(payload)})});
+      if (!response.headers.get('content-type')?.includes('application/json')) throw new Error('当前站点未启用 STEP 导出服务，请使用项目本地服务或桌面版。');
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error);
+      const download = (data,name,type) => {
+        const url=URL.createObjectURL(new Blob([data],{type}));
+        const link=document.createElement('a'); link.href=url; link.download=name; document.body.appendChild(link); link.click(); link.remove(); setTimeout(()=>URL.revokeObjectURL(url),60000);
+      };
+      download(Uint8Array.from(atob(result.file),c=>c.charCodeAt(0)),result.name,'application/step');
+      download(JSON.stringify(result.report,null,2),'forma-annotated.step.report.json','application/json');
+      done(JSON.stringify(result.report));
+    } catch(error) {done(JSON.stringify({error:String(error)}));}
+  },
+  pick(kind, done) {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.hidden = true;
+    document.body.appendChild(input);
+    input.multiple = kind === 'model';
+    input.accept = kind === 'annotation' ? '.json' : '.glb,.gltf,.bin,.png,.jpg,.jpeg,.webp,.step,.stp';
+    input.addEventListener('change', async () => {
+      try {
+        const step = Array.from(input.files).find(file => /\.(step|stp)$/i.test(file.name));
+        if (step && kind === 'model') {
+          const response = await fetch('/api/step/import', {method:'POST', headers:{'Content-Type':'application/octet-stream'}, body:await step.arrayBuffer()});
+          if (!response.headers.get('content-type')?.includes('application/json')) throw new Error('当前站点未启用 STEP 服务，请使用项目本地服务或桌面版。');
+          const result = await response.json();
+          if (!response.ok) throw new Error(result.error);
+          const prefix = '/tmp/mbd-upload-' + (++uploadId) + '/';
+          for (const [name,data] of Object.entries(result.files)) engine.copyToFS(prefix+name,Uint8Array.from(atob(data),c=>c.charCodeAt(0)));
+          done(JSON.stringify({kind:'step_bundle',token:result.token,paths:[prefix+'bundle.json']}));
+          return;
+        }
+        const paths = [];
+        const prefix = '/tmp/mbd-upload-' + (++uploadId) + '/';
+        for (const file of input.files) {
+          const name = (file.webkitRelativePath || file.name).split('/').filter(x => x && x !== '.' && x !== '..').join('/');
+          const path = prefix + name;
+          engine.copyToFS(path, await file.arrayBuffer());
+          paths.push(path);
+        }
+        if (paths.length) done(JSON.stringify({kind, paths}));
+      } catch (error) { done(JSON.stringify({kind, error: String(error)})); }
+      finally { input.remove(); }
+    }, {once:true});
+    input.addEventListener('cancel', () => input.remove(), {once:true});
+    input.click();
+  }
+};
+const missing = Engine.getMissingFeatures({threads: false});
+const fail = error => {
+  document.getElementById('error').textContent = '启动失败：' + String(error) + '\n请使用支持 WebGL 2 的现代浏览器，通过 HTTP(S) 打开。';
+  console.error(error);
+};
+if (missing.length) fail(missing.join(', '));
+else engine.startGame({onProgress(current,total){
+  const bar = document.getElementById('progress');
+  if (total > 0) {bar.max=total;bar.value=current;}
+}}).then(() => document.getElementById('loading').remove()).catch(fail);
+</script>
+</body>
+</html>
+
