@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Forma · 模型与工程标注</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='15' fill='%234d7c73'/%3E%3Cpath d='M20 47V17h27v7H28v7h16v7H28v9Z' fill='%23fbfcf8'/%3E%3C/svg%3E">
 <style>
 html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#e6eeeb;color:#283f3c;font-family:system-ui,sans-serif}#canvas{display:block;outline:none;width:100%;height:100%;touch-action:none}#loading{position:fixed;inset:0;display:grid;place-content:center;gap:16px;text-align:center;background:#e6eeeb}h1{margin:0;font-size:30px}p{margin:0;color:#647973}progress{width:320px;accent-color:#397e73}#error{max-width:600px;white-space:pre-wrap}#step-busy{position:fixed;inset:0;background:#f2f0e9dd;z-index:10;place-content:center;text-align:center;font-size:18px;color:#283f3c}#step-busy[data-mode="export"]{inset:auto 24px 100px auto;padding:14px 20px;border:1px solid #d7e2dc;border-radius:12px;background:#fbfcf8;box-shadow:0 3px 16px #28423b12;font-size:15px;pointer-events:none}
 </style>
@@ -15,7 +16,7 @@ html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#e6eeeb;col
 <div id="step-busy" hidden></div>
 <script src="index.js"></script>
 <script>
-const engine = new Engine({"args":[],"canvasResizePolicy":2,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":9581172,"index.wasm":39514754},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4});
+const engine = new Engine({"args":[],"canvasResizePolicy":2,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":9580996,"index.wasm":39514754},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4});
 let uploadId = 0;
 // STEP processing stays in a local Web Worker; no model is uploaded.
 const stepBusy = (active,mode='import') => {const element=document.getElementById('step-busy');element.dataset.mode=mode;element.textContent=mode==='export'?'正在生成并校验 STEP…':'正在本机加载 STEP…';element.hidden=!active;element.style.display=active?'grid':'none';};
